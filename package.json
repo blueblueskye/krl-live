@@ -1,0 +1,7 @@
+{
+  "name": "krl-live",
+  "private": true,
+  "type": "module",
+  "description": "Live animated map of KRL Commuter Line Jabodetabek trains",
+  "engines": { "node": ">=18" }
+}
