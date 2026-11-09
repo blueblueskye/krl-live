@@ -1,6 +1,6 @@
 {
-  "functions": { "api/trains.js": { "maxDuration": 60 } },
   "headers": [
+    { "source": "/timetable.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, s-maxage=600, stale-while-revalidate=86400" }] },
     { "source": "/(.*)\\.js", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
   ]
 }

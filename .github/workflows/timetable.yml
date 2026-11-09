@@ -1,0 +1,39 @@
+name: Update timetable
+
+on:
+  schedule:
+    - cron: "17 19 * * *"   # daily, 02:17 WIB
+  workflow_dispatch:         # "Run workflow" button in the Actions tab
+  push:
+    branches: [main]
+    paths: ["scripts/**", "network.js", ".github/workflows/timetable.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: timetable
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch schedules from KCI
+        run: node scripts/build-timetable.mjs
+      - name: Commit if trains changed
+        run: |
+          strip() { node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));delete j.generated;process.stdout.write(JSON.stringify(j))"; }
+          if git cat-file -e HEAD:timetable.json 2>/dev/null && [ "$(git show HEAD:timetable.json | strip)" = "$(strip < timetable.json)" ]; then
+            echo "No timetable changes."; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add timetable.json
+          git commit -m "Update timetable $(date -u +%Y-%m-%d)"
+          git push

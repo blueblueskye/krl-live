@@ -10,7 +10,7 @@ const GROUPS = [
   { id: "cikarang", name: "Cikarang", color: "#0084D8", re: /cikarang|loop|bekasi/i },
   { id: "rangkas", name: "Rangkasbitung", color: "#16812B", re: /rangkas|serpong|parung|maja/i },
   { id: "tangerang", name: "Tangerang", color: "#623814", re: /tangerang/i },
-  { id: "priok", name: "Tanjung Priok", color: "#DD0067", re: /priok/i },
+  { id: "priok", name: "Tanjung Priok", color: "#DD0067", re: /pri[ou]k/i },
   { id: "other", name: "Lainnya", color: "#7a7f8a", re: /.*/ },
 ];
 
@@ -120,7 +120,7 @@ const map = L.map("map", { zoomControl: false, attributionControl: true, minZoom
 L.control.zoom({ position: "bottomright" }).addTo(map);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Jadwal: <a href="https://comuline.com">Comuline</a>',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Jadwal: <a href="https://commuterline.id">KAI Commuter</a>',
 }).addTo(map);
 
 for (const l of LINES) {
@@ -293,9 +293,10 @@ function toast(msg, retry) {
 }
 async function fetchData() {
   try {
-    const r = await fetch("/api/trains");
+    const r = await fetch("/timetable.json", { cache: "no-cache" });
+    if (r.status === 404) throw new Error("jadwal belum dibuat, coba lagi beberapa menit lagi");
     const j = await r.json();
-    if (!r.ok || !j.trains) throw new Error(j.error || r.status);
+    if (!r.ok || !j.trains) throw new Error(r.status);
     load(j);
     $("#toast").classList.remove("show");
   } catch (e) {

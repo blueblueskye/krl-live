@@ -3,7 +3,7 @@
 Lightweight live map of KRL Commuter Line Jabodetabek trains. Every train running right now
 moves along the track, based on today's official timetable.
 
-- No build step, no npm install. Plain HTML + Leaflet (≈40 KB) + one Vercel function.
+- No build step, no npm install. Plain HTML + Leaflet (≈40 KB) + one static `timetable.json`.
 - Trains are drawn on a single canvas, so hundreds of them animate smoothly on a phone.
 - Tap a train → its stops and times. Tap a station → next departures.
 - 1× / 10× / 60× playback, line filters, light/dark mode.
@@ -11,15 +11,16 @@ moves along the track, based on today's official timetable.
 ## How it works
 
 ```
-browser ──► /api/trains (Vercel function, CDN-cached 1 h)
-                 └─► Comuline API  (public mirror of KAI Commuter's daily schedule)
-                       /v1/station          all stations
-                       /v1/schedule/{id}    every departure from one station
+GitHub Action (daily 02:17 WIB) ──► kci.id/api/krl  (KAI Commuter's public API, no key)
+        │                              /stations
+        │                              /schedules?stationid=…   every departure from one station
+        └─► commits timetable.json ──► Vercel redeploys ──► browser loads one static file
 ```
 
-The function fetches every station's departures, groups rows by `train_id`, and returns each
-train's full stop list with times. The browser interpolates each train's position between
-stops (30 s dwell, smooth accel/brake) and routes it along the track graph in `network.js`.
+`scripts/build-timetable.mjs` fetches each station's departures (slowly; KCI throttles bursts),
+groups rows by train number, and writes every train's stop list with times. The browser then
+interpolates each train's position between stops (30 s dwell, smooth accel/brake) and routes it
+along the track graph in `network.js`. No server code runs when people open the app.
 
 **Positions are timetable-based, not GPS.** KAI Commuter doesn't publish live train
 positions, so a delayed train will still be drawn on schedule.
@@ -36,10 +37,10 @@ npx vercel        # preview
 npx vercel --prod # production
 ```
 
-After deploying, open `https://<your-app>.vercel.app/api/trains` once. You should see JSON with
-a long `trains` array. `unmatched` lists any station in `network.js` the API didn't recognise.
+The timetable is built by the **Update timetable** workflow (GitHub → Actions tab). It runs daily,
+on every change to `network.js`/`scripts/`, and from the "Run workflow" button.
 
-Local dev: `npx vercel dev`, then open http://localhost:3000.
+Local: `node scripts/build-timetable.mjs`, then serve the folder with any static server.
 
 ## Files
 
@@ -48,14 +49,15 @@ Local dev: `npx vercel dev`, then open http://localhost:3000.
 | `index.html` | Page + styles |
 | `app.js` | Map, animation, panels |
 | `network.js` | Station coordinates and line order (shared with the API) |
-| `api/trains.js` | Builds today's timetable from Comuline |
-| `vercel.json` | Function timeout, cache headers |
+| `scripts/build-timetable.mjs` | Builds `timetable.json` from KCI |
+| `.github/workflows/timetable.yml` | Runs the builder daily and commits the result |
+| `vercel.json` | Cache headers |
 
 ## Tweaking
 
 - **Station position off?** Edit its `p: [lat, lng]` in `network.js`. Coordinates are approximate.
 - **Station not matched?** Add the API's spelling to its `a: [...]` list (lowercase, letters only).
-- **Different data source:** set env var `COMULINE_BASE` in Vercel (default `https://www.api.comuline.com/v1`).
+- **Different API base:** set `KCI_BASE_URL` for the workflow (default `https://kci.id/api/krl`).
 - Dwell time / show-before-departure: constants at the top of `app.js`.
 
-Map © OpenStreetMap contributors. Schedule data via Comuline (comuline.com).
+Map © OpenStreetMap contributors. Schedule data: KAI Commuter (kci.id).
