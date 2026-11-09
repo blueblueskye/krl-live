@@ -11,16 +11,16 @@ moves along the track, based on today's official timetable.
 ## How it works
 
 ```
-GitHub Action (daily 02:17 WIB) ──► kci.id/api/krl  (KAI Commuter's public API, no key)
-        │                              /stations
-        │                              /schedules?stationid=…   every departure from one station
+GitHub Action (daily 02:17 WIB) ──► api.commute.shiorilabs.id   (Commute by Shiori Labs, open data)
+        │                              /stations/KCI                   stations + coordinates
+        │                              /stations/KCI/{code}/timetable  every departure from one station
         └─► commits timetable.json ──► Vercel redeploys ──► browser loads one static file
 ```
 
-`scripts/build-timetable.mjs` fetches each station's departures (slowly; KCI throttles bursts),
-groups rows by train number, and writes every train's stop list with times. The browser then
-interpolates each train's position between stops (30 s dwell, smooth accel/brake) and routes it
-along the track graph in `network.js`. No server code runs when people open the app.
+`scripts/build-timetable.mjs` fetches each station's departures, groups them by train number and
+day type (weekday / Saturday / Sunday), and writes every train's stop list with times plus real
+station coordinates. The browser interpolates each train between stops (30 s dwell, smooth
+accel/brake) along the track graph in `network.js`. No server code runs when people open the app.
 
 **Positions are timetable-based, not GPS.** KAI Commuter doesn't publish live train
 positions, so a delayed train will still be drawn on schedule.
@@ -49,15 +49,19 @@ Local: `node scripts/build-timetable.mjs`, then serve the folder with any static
 | `index.html` | Page + styles |
 | `app.js` | Map, animation, panels |
 | `network.js` | Station coordinates and line order (shared with the API) |
-| `scripts/build-timetable.mjs` | Builds `timetable.json` from KCI |
+| `scripts/build-timetable.mjs` | Builds `timetable.json` from the Commute API |
 | `.github/workflows/timetable.yml` | Runs the builder daily and commits the result |
 | `vercel.json` | Cache headers |
 
 ## Tweaking
 
-- **Station position off?** Edit its `p: [lat, lng]` in `network.js`. Coordinates are approximate.
+- **Station positions** come from the Commute API; `network.js` only holds fallbacks and the line order.
 - **Station not matched?** Add the API's spelling to its `a: [...]` list (lowercase, letters only).
-- **Different API base:** set `KCI_BASE_URL` for the workflow (default `https://kci.id/api/krl`).
+- **Different API base:** set `COMMUTE_API` for the workflow (default `https://api.commute.shiorilabs.id`).
 - Dwell time / show-before-departure: constants at the top of `app.js`.
 
-Map © OpenStreetMap contributors. Schedule data: KAI Commuter (kci.id).
+Map © OpenStreetMap contributors. ## Data credits & license
+
+Timetable and station data: [Commute](https://commute.shiorilabs.id) by Shiori Labs, licensed
+[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) (station geometry © OpenStreetMap
+contributors). `timetable.json` is a derived database and is likewise released under ODbL 1.0.

@@ -71,17 +71,24 @@ function along(g, f) {
 
 // ---------- trains ----------
 let TRAINS = [];
-function groupOf(line, route) {
-  const s = `${line} ${route}`;
-  return GROUPS.find((g) => g.re.test(s));
+const LINE_GROUP = { B: "bogor", C: "cikarang", R: "rangkas", T: "tangerang", TP: "priok" };
+const groupOf = (line, route) => GROUPS.find((g) => g.id === LINE_GROUP[line]) || GROUPS.find((g) => g.re.test(`${line} ${route}`));
+
+// Service-day bit (Mon-Fri 4, Sat 2, Sun 1) for today, or `back` days ago, in Jakarta.
+function dayBit(back = 0) {
+  const d = new Date(Date.now() + 7 * 3600e3 - back * 86400e3).getUTCDay();
+  return d === 0 ? 1 : d === 6 ? 2 : 4;
 }
+
 function load(data) {
-  TRAINS = data.trains.map(([id, line, color, route, flat]) => {
+  for (const [k, p] of Object.entries(data.coords || {})) if (STATIONS[k]) STATIONS[k].p = p;
+  pathCache.clear();
+  drawNetwork();
+  TRAINS = data.trains.map(([id, line, mask, boundFor, flat]) => {
     const keys = [], t = [];
     for (let i = 0; i < flat.length; i += 2) if (STATIONS[flat[i]]) { keys.push(flat[i]); t.push(flat[i + 1]); }
-    const g = groupOf(line, route);
-    return { id, line: title(String(line).replace(/commuter\s*line\s*/i, "")), route, group: g.id,
-      color: /^#[0-9a-f]{6}$/i.test(color || "") ? color : g.color, keys, t };
+    const g = groupOf(line, boundFor);
+    return { id, uid: `${id}|${mask}`, mask: mask ?? 7, line: "Lin " + g.name, group: g.id, color: g.color, keys, t };
   }).filter((x) => x.keys.length > 1);
   buildLegend();
 }
@@ -89,7 +96,8 @@ function load(data) {
 // Where is train `tr` at seconds `T`? null if not running.
 function locate(tr, T0) {
   const n = tr.t.length;
-  for (const T of [T0, T0 + DAY]) {
+  for (const [T, back] of [[T0, 0], [T0 + DAY, 1]]) {   // today's trips, then yesterday's still running after midnight
+    if (!(tr.mask & dayBit(back))) continue;
     if (T < tr.t[0] - PRE_DEPART || T > tr.t[n - 1] + POST_ARRIVE) continue;
     if (T < tr.t[0]) {
       const g = trackPath(tr.keys[0], tr.keys[1]);
@@ -120,26 +128,32 @@ const map = L.map("map", { zoomControl: false, attributionControl: true, minZoom
 L.control.zoom({ position: "bottomright" }).addTo(map);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Jadwal: <a href="https://commuterline.id">KAI Commuter</a>',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Jadwal: <a href="https://commute.shiorilabs.id">Commute</a> (Shiori Labs, ODbL)',
 }).addTo(map);
 
-for (const l of LINES) {
-  const pts = l.seq.map((k) => STATIONS[k].p);
-  L.polyline(pts, { color: dark ? "#000" : "#fff", weight: 7, opacity: 0.7, interactive: false }).addTo(map);
-  L.polyline(pts, { color: l.color, weight: 4, opacity: 0.85, interactive: false }).addTo(map);
+const network = L.layerGroup().addTo(map);
+let stationMarkers = [];
+function drawNetwork() {           // track + stations; redrawn once real coordinates arrive
+  network.clearLayers();
+  stationMarkers = [];
+  for (const l of LINES) {
+    const pts = l.seq.map((k) => STATIONS[k].p);
+    L.polyline(pts, { color: dark ? "#000" : "#fff", weight: 7, opacity: 0.7, interactive: false }).addTo(network);
+    L.polyline(pts, { color: l.color, weight: 4, opacity: 0.85, interactive: false }).addTo(network);
+  }
+  for (const [k, s] of Object.entries(STATIONS)) {
+    const hub = (adj[k]?.size || 0) > 2;
+    const m = L.circleMarker(s.p, { radius: hub ? 5 : 3.5, color: dark ? "#d8dbe2" : "#2a2d33", weight: hub ? 2 : 1.5,
+      fillColor: dark ? "#16181e" : "#fff", fillOpacity: 1, bubblingMouseEvents: false })
+      .bindTooltip(s.n, { permanent: true, direction: "right", offset: [5, 0], className: "st-label" })
+      .addTo(network);
+    m.hub = hub;
+    m.on("click", (e) => { const hit = trainAt(e.containerPoint); hit ? selectTrain(hit) : selectStation(k); });
+    stationMarkers.push(m);
+  }
+  if (typeof onZoom === "function") onZoom();
 }
-
-const stationMarkers = [];
-for (const [k, s] of Object.entries(STATIONS)) {
-  const hub = (adj[k]?.size || 0) > 2;
-  const m = L.circleMarker(s.p, { radius: hub ? 5 : 3.5, color: dark ? "#d8dbe2" : "#2a2d33", weight: hub ? 2 : 1.5,
-    fillColor: dark ? "#16181e" : "#fff", fillOpacity: 1, bubblingMouseEvents: false })
-    .bindTooltip(s.n, { permanent: true, direction: "right", offset: [5, 0], className: "st-label" })
-    .addTo(map);
-  m.hub = hub;
-  m.on("click", (e) => { const hit = trainAt(e.containerPoint); hit ? selectTrain(hit) : selectStation(k); });
-  stationMarkers.push(m);
-}
+drawNetwork();
 function onZoom() {
   const z = map.getZoom();
   map.getContainer().classList.toggle("zfar", z < 13);
@@ -242,7 +256,7 @@ card.addEventListener("click", (e) => {
   if (e.target.closest(".x")) return closeCard();
   const row = e.target.closest("[data-train]");
   if (row) {
-    const tr = TRAINS.find((t) => t.id === row.dataset.train);
+    const tr = TRAINS.find((t) => t.uid === row.dataset.train);
     if (tr) { selectTrain(tr); const loc = locate(tr, simNow()); if (loc) map.panTo(loc.p); }
   }
 });
@@ -273,14 +287,14 @@ function renderStation(T) {
   for (const tr of TRAINS) {
     const i = tr.keys.indexOf(k);
     if (i < 0 || i === tr.keys.length - 1) continue;      // skip trains ending here
-    for (const d of [0, DAY]) { const t = tr.t[i] - d; if (t >= T - 30 && t < T + 3 * 3600) rows.push({ tr, t }); }
+    for (const [d, back] of [[0, 0], [DAY, 1]]) { if (!(tr.mask & dayBit(back))) continue; const t = tr.t[i] - d; if (t >= T - 30 && t < T + 3 * 3600) rows.push({ tr, t }); }
   }
   rows.sort((a, b) => a.t - b.t);
   card.innerHTML = `<button class="x" aria-label="Tutup">×</button>
     <h2>${esc(STATIONS[k].n)}</h2><div class="sub">Keberangkatan berikutnya</div>
     ${rows.length ? `<table>${rows.slice(0, 10).map(({ tr, t }) => {
       const m = Math.round((t - T) / 60);
-      return `<tr data-train="${esc(tr.id)}"><td>${hhmm(t)}</td><td><span class="bar" style="background:${tr.color}"></span>${esc(STATIONS[tr.keys[tr.keys.length - 1]].n)}</td><td>${m <= 0 ? "now" : m + " mnt"}</td></tr>`;
+      return `<tr data-train="${esc(tr.uid)}"><td>${hhmm(t)}</td><td><span class="bar" style="background:${tr.color}"></span>${esc(STATIONS[tr.keys[tr.keys.length - 1]].n)}</td><td>${m <= 0 ? "now" : m + " mnt"}</td></tr>`;
     }).join("")}</table>` : `<div class="sub">Tidak ada keberangkatan dalam 3 jam ke depan.</div>`}`;
 }
 
