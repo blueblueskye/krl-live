@@ -118,9 +118,9 @@ const dark = matchMedia("(prefers-color-scheme: dark)").matches;
 const map = L.map("map", { zoomControl: false, attributionControl: true, minZoom: 9, maxZoom: 17 })
   .setView([-6.235, 106.82], innerWidth < 600 ? 11 : 12);
 L.control.zoom({ position: "bottomright" }).addTo(map);
-L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`, {
-  subdomains: "abcd", maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a> · Jadwal: <a href="https://comuline.com">Comuline</a>',
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Jadwal: <a href="https://comuline.com">Comuline</a>',
 }).addTo(map);
 
 for (const l of LINES) {

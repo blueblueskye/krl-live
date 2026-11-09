@@ -70,11 +70,14 @@
   #card td:last-child { text-align: right; color: var(--muted); font: 12px var(--mono); }
   #card .bar { display: inline-block; width: 4px; height: 12px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
 
-  #toast { left: 50%; transform: translateX(-50%); top: max(12px, env(safe-area-inset-top)); padding: 10px 14px; display: none; max-width: min(90vw, 420px); font-size: 13px; }
+  #toast { left: 50%; transform: translateX(-50%); bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px)); padding: 10px 14px; display: none; max-width: min(90vw, 420px); font-size: 13px; }
   #toast.show { display: block; }
   #toast button { margin-left: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
 
   .leaflet-container { font: inherit; background: var(--bg); }
+  /* OSM tiles, muted so the lines stand out; inverted for dark mode */
+  .leaflet-tile-pane { filter: saturate(.35) contrast(.92) brightness(1.04); }
+  @media (prefers-color-scheme: dark) { .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) saturate(.3) brightness(.85) contrast(.9); } }
   .st-label { background: none; border: 0; box-shadow: none; padding: 0 0 0 2px; color: var(--ink); font-size: 11px; font-weight: 600;
     text-shadow: 0 0 3px var(--bg), 0 0 3px var(--bg), 0 0 2px var(--bg); }
   .st-label::before { display: none; }

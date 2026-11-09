@@ -58,4 +58,4 @@ Local dev: `npx vercel dev`, then open http://localhost:3000.
 - **Different data source:** set env var `COMULINE_BASE` in Vercel (default `https://www.api.comuline.com/v1`).
 - Dwell time / show-before-departure: constants at the top of `app.js`.
 
-Map © OpenStreetMap contributors © CARTO. Schedule data via Comuline (comuline.com).
+Map © OpenStreetMap contributors. Schedule data via Comuline (comuline.com).

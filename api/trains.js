@@ -119,6 +119,8 @@ export default async function handler(req, res) {
     res.status(200).json(data);
   } catch (e) {
     res.setHeader("Cache-Control", "no-store");
-    res.status(502).json({ error: String(e?.message || e) });
+    const k = e?.cause;
+    const detail = k ? ` (${[k.code, k.message].filter(Boolean).join(": ")})` : "";
+    res.status(502).json({ error: `${e?.message || e}${detail}`, source: BASE });
   }
 }
